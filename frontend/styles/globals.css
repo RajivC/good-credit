@@ -10,8 +10,8 @@ html, body {
 
 /* Heading color‐cycle animation */
 @keyframes textColorCycle {
-  0%, 100% { color: #ff6b6b; }
+  0%, 100% { color: red; }
   25%      { color: #6b6bff; }
-  50%      { color: #6bff6b; }
+  50%      { color: orange; }
   75%      { color: #ffde6b; }
 }

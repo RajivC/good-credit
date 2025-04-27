@@ -3,6 +3,7 @@ import Head from 'next/head';
 import { Hero } from '../components/Hero';
 import { ConnectWallet } from '../components/ConnectWallet';
 import { UploadFile } from '../components/UploadFile';
+import { Contact } from '../components/Contact';
 
 const Home: NextPage = () => (
   <div className="min-h-screen flex flex-col items-center bg-gray-50 py-10">
@@ -24,6 +25,7 @@ const Home: NextPage = () => (
     <main className="w-full max-w-3xl mx-auto space-y-10">
       <ConnectWallet />
       <UploadFile />
+      <Contact />
     </main>
 
     {/* Footer */}
