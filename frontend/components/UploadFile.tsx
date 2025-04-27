@@ -1,62 +1,64 @@
 import { useState } from 'react';
-import { create } from 'ipfs-http-client';
+import { uploadToPinata } from '../lib/pinata';
 
-const projectId = process.env.NEXT_PUBLIC_INFURA_PROJECT_ID!;
-const projectSecret = process.env.NEXT_PUBLIC_INFURA_PROJECT_SECRET!;
-const auth =
-  'Basic ' + Buffer.from(`${projectId}:${projectSecret}`).toString('base64');
-
-const ipfs = create({
-  host: 'ipfs.infura.io',
-  port: 5001,
-  protocol: 'https',
-  headers: { authorization: auth },
-});
-
+/**
+ * UploadFile component:
+ * - Allows user to select a File
+ * - Posts it to Pinata via uploadToPinata()
+ * - Displays resulting CID or error
+ */
 export function UploadFile() {
-  const [cid, setCid] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
+  const [cid, setCid] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  async function handleUpload() {
+  const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setCid(null);
+    setFile(e.target.files?.[0] ?? null);
+  };
+
+  const onUpload = async () => {
     if (!file) {
-      alert('Please select a file first');
+      alert('Please select a file first.');
       return;
     }
     setLoading(true);
     try {
-      const added = await ipfs.add(file);
-      setCid(added.cid.toString());
-    } catch (err) {
-      console.error(err);
-      alert('Upload failed');
+      const newCid = await uploadToPinata(file);
+      setCid(newCid);
+    } catch (err: any) {
+      console.error('Pinata upload error:', err);
+      alert(`Upload failed: ${err.message || err}`);
     } finally {
       setLoading(false);
     }
-  }
+  };
 
   return (
-    <div className="bg-white shadow-md rounded-lg p-6 max-w-md mx-auto">
-      <h2 className="text-xl font-semibold mb-4">Upload & Store File</h2>
+    <div className="max-w-md mx-auto p-6 bg-white rounded-lg shadow space-y-4">
+      <h3 className="text-lg font-medium">Upload & Pin Document</h3>
+
       <input
         type="file"
-        onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-        className="block w-full text-sm text-gray-500
+        onChange={onFileChange}
+        className="block w-full mb-2 text-gray-700
                    file:py-2 file:px-4 file:rounded file:border-0
-                   file:text-sm file:font-medium file:bg-blue-50
-                   file:text-blue-700 hover:file:bg-blue-100 mb-4"
+                   file:text-sm file:font-semibold
+                   file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
       />
+
       <button
-        onClick={handleUpload}
-        disabled={loading}
-        className={`w-full py-2 text-white font-medium rounded-md transition 
-          ${loading ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-700'}`}
+        onClick={onUpload}
+        disabled={!file || loading}
+        className={`w-full py-2 text-white font-semibold rounded-lg transition
+          ${loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'}`}
       >
-        {loading ? 'Uploading...' : 'Upload File'}
+        {loading ? 'Pinning to IPFS…' : 'Pin to IPFS via Pinata'}
       </button>
+
       {cid && (
-        <p className="mt-4 text-sm text-gray-600 break-all">
-          <span className="font-semibold">IPFS CID:</span> {cid}
+        <p className="break-all text-sm text-gray-700">
+          📌 Pinned! CID: <code>{cid}</code>
         </p>
       )}
     </div>
