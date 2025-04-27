@@ -3,7 +3,10 @@ import React from 'react';
 
 export function Contact() {
   return (
-    <div className="w-full max-w-3xl mx-auto bg-white shadow-md rounded-lg p-6">
+    <div 
+        className="w-full max-w-3xl mx-auto bg-white shadow-md rounded-lg p-6"
+        id="contact"
+    >
       <h2 className="text-2xl font-semibold mb-4 text-center text-gray-800">
         Contact Us
       </h2>

@@ -30,7 +30,7 @@ const Home: NextPage = () => (
 
     {/* Footer */}
     <footer className="mt-auto py-4 text-center text-sm text-gray-500">
-      © {new Date().getFullYear()} Blockchain Financial Statements DApp
+      © {new Date().getFullYear()} Blockchain Financial Statements DApp (Developed By: Rajiv, Wei, Yu, Sky, Ricky)
     </footer>
   </div>
 );
