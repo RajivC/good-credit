@@ -1,5 +1,17 @@
 @import "tailwindcss";
 
+html {
+  scroll-behavior: smooth;
+}
+
 html, body {
-  @apply bg-gray-50 text-gray-800;
+  @apply bg-gray-50 text-gray-900;
+}
+
+/* Heading color‐cycle animation */
+@keyframes textColorCycle {
+  0%, 100% { color: #ff6b6b; }
+  25%      { color: #6b6bff; }
+  50%      { color: #6bff6b; }
+  75%      { color: #ffde6b; }
 }

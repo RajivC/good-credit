@@ -1,32 +1,36 @@
 import type { NextPage } from 'next';
 import Head from 'next/head';
+import { Hero } from '../components/Hero';
 import { ConnectWallet } from '../components/ConnectWallet';
 import { UploadFile } from '../components/UploadFile';
 
-const Home: NextPage = () => {
-  return (
-    <div className="min-h-screen flex flex-col items-center bg-gray-50">
-      <Head>
-        <title>Legal Document DApp</title>
-      </Head>
-      <header className="w-full bg-white shadow-sm">
-        <div className="max-w-3xl mx-auto py-4 px-6 text-center">
-          <h1 className="text-2xl font-bold text-gray-800">
-            Legal Document Management
-          </h1>
-        </div>
-      </header>
+const Home: NextPage = () => (
+  <div className="min-h-screen flex flex-col items-center bg-gray-50 py-10">
+    <Head>
+      <title>Financial Statements DApp</title>
+    </Head>
 
-      <main className="flex-1 w-full max-w-3xl mx-auto py-10 space-y-10">
-        <ConnectWallet />
-        <UploadFile />
-      </main>
+    {/* Header or Navbar */}
+    <header className="w-full max-w-3xl mx-auto mb-8">
+      {/* Optional branding / nav goes here */}
+    </header>
 
-      <footer className="w-full py-4 bg-white text-center text-sm text-gray-500">
-        © {new Date().getFullYear()} Blockchain Legal DApp
-      </footer>
+    {/* Hero section with bottom margin */}
+    <div className="w-full max-w-3xl mx-auto mb-12">
+      <Hero />
     </div>
-  );
-};
+
+    {/* Main actions section */}
+    <main className="w-full max-w-3xl mx-auto space-y-10">
+      <ConnectWallet />
+      <UploadFile />
+    </main>
+
+    {/* Footer */}
+    <footer className="mt-auto py-4 text-center text-sm text-gray-500">
+      © {new Date().getFullYear()} Blockchain Financial Statements DApp
+    </footer>
+  </div>
+);
 
 export default Home;
