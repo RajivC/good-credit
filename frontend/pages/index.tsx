@@ -2,7 +2,7 @@ import type { NextPage } from 'next';
 import Head from 'next/head';
 import { Hero } from '../components/Hero';
 import { ConnectWallet } from '../components/ConnectWallet';
-import { UploadFile } from '../components/UploadFile';
+import UploadFile from '../components/UploadFile';
 import { Contact } from '../components/Contact';
 
 const Home: NextPage = () => (
