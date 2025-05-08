@@ -24,4 +24,6 @@
 5. Open your browser and go to [http://localhost:3000](http://localhost:3000) to use the search engine.
 
 ## Links
-1. [Github](https://github.com/RajivC/good-credit)
+1. Github: [Link](https://github.com/RajivC/good-credit)
+2. Demo: [Link](https://youtu.be/JnZ056Eh-To)
+3. Slides: [Link](https://www.canva.com/design/DAGl2_bTuLg/Q16LnbQbRupyHhZnAJlWvw/edit?utm_content=DAGl2_bTuLg&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton)
