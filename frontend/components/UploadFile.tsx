@@ -25,17 +25,17 @@ export function UploadFile({
     setLoading(true)
 
     try {
-      // 1) Make sure we have the right contract
+      // 1) Contract address
       const address = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS
       if (!address) throw new Error('Missing CONTRACT_ADDRESS')
 
-      // 2) Ensure Sepolia
+      // 2) Network check
       const chainId = await window.ethereum.request({ method: 'eth_chainId' })
       if (chainId !== '0xaa36a7') {
         throw new Error('Switch MetaMask to Sepolia')
       }
 
-      // 3) Encrypt
+      // 3) Encrypt payload
       const publicKey = await getPublicKey()
       const rawText   = new TextDecoder().decode(await file.arrayBuffer())
       const payload   = encryptData(publicKey, rawText)
@@ -43,23 +43,26 @@ export function UploadFile({
       // 4) Pin to IPFS
       const encryptedFile = new File(
         [new Blob([payload], { type: 'application/octet-stream' })],
-        file.name + '.enc',
+        `${file.name}.enc`,
         { type: 'application/octet-stream' }
       )
       const newCid = await uploadToPinata(encryptedFile)
+      console.log('[UploadFile] new CID:', newCid)
       setCid(newCid)
 
-      // 5) Write on‑chain
+      // 5) Write on-chain
       await window.ethereum.request({ method: 'eth_requestAccounts' })
       const provider = new ethers.BrowserProvider(window.ethereum as any)
       const signer   = await provider.getSigner()
       const contract = new ethers.Contract(address, ABI, signer)
 
       const tx = await contract.registerUsername(newCid)
-      const receipt = await tx.wait()
-      setTxHash(receipt.transactionHash)
+      console.log('[UploadFile] tx response:', tx)
+      setTxHash(tx.hash)
 
-      // let the list know to refresh
+      const receipt = await tx.wait()
+      console.log('[UploadFile] tx receipt:', receipt)
+
       onSuccess?.()
     } catch (err: any) {
       console.error('UploadFile error:', err)
@@ -86,8 +89,24 @@ export function UploadFile({
       >
         {loading ? 'Processing…' : 'Encrypt & Register'}
       </button>
-      {cid    && <p className="mt-4 break-all"><strong>CID:</strong> {cid}</p>}
-      {txHash && <p className="mt-2 break-all text-blue-600"><strong>TxHash:</strong> {txHash}</p>}
+      {cid && (
+        <p className="mt-4 break-all">
+          <strong>CID:</strong> {cid}
+        </p>
+      )}
+      {txHash && (
+        <p className="mt-2 break-all text-blue-600">
+          <strong>TxHash:</strong>{' '}
+          <a
+            href={`https://sepolia.etherscan.io/tx/${txHash}`}
+            target="_blank"
+            rel="noreferrer"
+            className="underline"
+          >
+            {txHash}
+          </a>
+        </p>
+      )}
     </div>
   )
 }

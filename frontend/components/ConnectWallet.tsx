@@ -12,6 +12,9 @@ export function ConnectWallet() {
   }
   return (
     <div className="max-w-3xl mx-auto bg-white p-6 rounded shadow">
+      <h2 className="text-2xl font-semibold mb-4 text-center">
+        Connect Your Wallet
+      </h2>
       <button
         onClick={connect}
         className="w-full py-2 bg-blue-600 text-white rounded"
