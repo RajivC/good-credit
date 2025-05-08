@@ -91,7 +91,7 @@ export function UploadFile({
       </button>
       {cid && (
         <p className="mt-4 break-all">
-          <strong>CID:</strong> {cid}
+          <strong>📌 Pinned! CID:</strong> {cid}
         </p>
       )}
       {txHash && (
