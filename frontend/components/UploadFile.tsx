@@ -1,90 +1,96 @@
-// components/UploadFile.tsx
-'use client';
+import { useState } from 'react'
+import { ethers } from 'ethers'
+import DocumentRegistryArtifact from '../abis/DocumentRegistry.json'
+import { getPublicKey, encryptData } from '../lib/encryption'
+import { uploadToPinata } from '../lib/pinata'
 
-import { useState } from 'react';
-import { ethers } from 'ethers';
-import { uploadToPinata } from '../lib/pinata';
-import { registerOnChain } from '../lib/registry';
+const ABI = DocumentRegistryArtifact.abi
 
-export default function UploadFile() {
-  const [file,    setFile]    = useState<File | null>(null);
-  const [cid,     setCid]     = useState<string | null>(null);
-  const [txHash,  setTxHash]  = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+export function UploadFile() {
+  const [cid, setCid] = useState<string | null>(null)
+  const [txHash, setTxHash] = useState<string | null>(null)
+  const [file, setFile] = useState<File | null>(null)
+  const [loading, setLoading] = useState(false)
 
-  function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    setCid(null);
-    setTxHash(null);
-    setFile(e.target.files?.[0] ?? null);
-  }
-
-  async function onUpload() {
+  async function handleUpload() {
     if (!file) {
-      alert('Please select a file first.');
-      return;
+      alert('Please select a file first')
+      return
     }
-    if (!window.ethereum) {
-      alert('MetaMask not detected. Please install it first.');
-      return;
-    }
+    setLoading(true)
 
-    setLoading(true);
     try {
-      // 1) Pin the file to IPFS via Pinata
-      const newCid = await uploadToPinata(file);
-      setCid(newCid);
+      // 1) Validate contract address
+      const address = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS
+      if (!address) {
+        throw new Error('Missing NEXT_PUBLIC_CONTRACT_ADDRESS in .env.local')
+      }
 
-      // 2) Get a signer from MetaMask
-      const provider = new ethers.BrowserProvider(window.ethereum as any);
-      const signer   = await provider.getSigner();
+      // 2) Ensure Sepolia network
+      const chainId = await window.ethereum.request({ method: 'eth_chainId' })
+      if (chainId !== '0xaa36a7') {
+        throw new Error('Please switch MetaMask to Sepolia')
+      }
 
-      // 3) Register on-chain
-      const tx = await registerOnChain(signer, newCid);
-      setTxHash(tx);
+      // 3) Fetch public key and encrypt file contents
+      const publicKey = await getPublicKey()
+      const rawBuffer = await file.arrayBuffer()
+      const rawText = new TextDecoder().decode(rawBuffer)
+      const encryptedPayload = encryptData(publicKey, rawText)
+
+      // 4) Wrap payload in a Blob and upload via uploadToPinata
+      const blob = new Blob([encryptedPayload], { type: 'application/octet-stream' })
+      const encryptedFile = new File([blob], file.name + '.enc', {
+        type: 'application/octet-stream',
+      })
+      const newCid = await uploadToPinata(encryptedFile)
+      setCid(newCid)
+
+      // 5) Register the CID on‑chain
+      await window.ethereum.request({ method: 'eth_requestAccounts' })
+      const provider = new ethers.BrowserProvider(window.ethereum as any)
+      const signer = await provider.getSigner()
+      const contract = new ethers.Contract(address, ABI, signer)
+
+      const tx = await contract.registerUsername(newCid)
+      const receipt = await tx.wait()
+      setTxHash(receipt.transactionHash)
+
     } catch (err: any) {
-      console.error(err);
-      alert(`Upload/Register failed:\n${err.message || err}`);
+      console.error('UploadFile error:', err)
+      alert(err.message || 'Upload failed')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
   }
 
   return (
-    <div className="max-w-lg mx-auto p-6 bg-white rounded-2xl shadow-lg space-y-4">
-      <h3 className="text-xl font-semibold">Upload & Register Document</h3>
-
+    <div id="upload" className="max-w-3xl mx-auto bg-white p-6 rounded shadow mt-8">
+      <h2 className="text-2xl font-semibold mb-4 text-center">
+        Encrypt & Register File
+      </h2>
       <input
         type="file"
-        onChange={onFileChange}
-        className="
-          block w-full mb-2 text-gray-600
-          file:py-2 file:px-4 file:rounded file:border-0
-          file:text-sm file:font-medium
-          file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100
-        "
+        onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+        className="block w-full mb-4"
       />
-
       <button
-        onClick={onUpload}
-        disabled={!file || loading}
-        className={`
-          w-full py-2 text-white font-medium rounded-lg transition
-          ${loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'}
-        `}
+        disabled={loading}
+        onClick={handleUpload}
+        className="w-full py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
       >
-        {loading ? 'Processing…' : 'Upload & Register'}
+        {loading ? 'Processing…' : 'Encrypt & Register'}
       </button>
-
       {cid && (
-        <p className="break-all text-sm text-gray-700">
-          📌 IPFS CID: <code>{cid}</code>
+        <p className="mt-4 break-all">
+          <strong>CID:</strong> {cid}
         </p>
       )}
       {txHash && (
-        <p className="break-all text-sm text-gray-700">
-          🔗 Tx Hash: <code>{txHash}</code>
+        <p className="mt-2 break-all text-blue-600">
+          <strong>TxHash:</strong> {txHash}
         </p>
       )}
     </div>
-  );
+  )
 }

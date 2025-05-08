@@ -8,11 +8,16 @@ export function Hero() {
         className="text-4xl font-extrabold mb-4 text-center"
         style={{ animation: 'textColorCycle 8s ease-in-out infinite' }}
       >
-        Secure Financial Document Management
+        Secure Legal Document Management
       </h1>
       <p className="text-lg mb-6 text-center">
-        Quickly upload, encrypt, and verify your sensitive financial doucments on-chain. We leverage MetaMask for identity, AES-GCM for encryption, and IPFS for storage.
+        Quickly upload, encrypt, and verify your legal contracts and wills on-chain. We leverage MetaMask for identity, AES-GCM for encryption, and IPFS for storage.
       </p>
+
+      <p className="text-lg mb-6 text-center">
+        Upload files → client‑side encrypt under your wallet’s public key → pin to IPFS → register CID on‑chain.
+      </p>
+
       <div className="flex justify-center">
         <Link
           href="#contact"
