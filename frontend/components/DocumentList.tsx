@@ -1,128 +1,135 @@
 // components/DocumentList.tsx
-import { useEffect, useState, useCallback } from "react";
-import { ethers } from "ethers";
-import DocumentRegistryArtifact from "../abis/DocumentRegistry.json";
+import { useEffect, useState, useCallback } from 'react'
+import { ethers } from 'ethers'
+import DocumentRegistryArtifact from '../abis/DocumentRegistry.json'
 
-const ABI = DocumentRegistryArtifact.abi;
-const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS!;
-const IPFS_GATEWAY = "https://gateway.pinata.cloud/ipfs/";
+interface Doc {
+  cid: string
+  name: string
+  date: string
+}
+
+const ABI = DocumentRegistryArtifact.abi
+const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS!
+const IPFS_GATEWAY     = 'https://gateway.pinata.cloud/ipfs/'
+const PINATA_API       = 'https://api.pinata.cloud/data/pinList?hashContains='
 
 export function DocumentList({ refreshKey }: { refreshKey?: number }) {
-    const [cids, setCids] = useState<string[]>([]);
-    const [error, setError] = useState<string | null>(null);
-    const [loading, setLoading] = useState(false);
+  const [docs, setDocs]       = useState<Doc[]>([])
+  const [error, setError]     = useState<string|null>(null)
+  const [loading, setLoading] = useState(false)
 
-    const load = useCallback(async () => {
-        setLoading(true);
-        setError(null);
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
 
+    try {
+      const accounts: string[] = await window.ethereum.request({ method: 'eth_accounts' })
+      if (!accounts.length) throw new Error('Connect your wallet first')
+      const provider = new ethers.BrowserProvider(window.ethereum as any)
+      const signer   = await provider.getSigner()
+      const { chainId } = await provider.getNetwork()
+      if (Number(chainId) !== 11155111) throw new Error('Switch MetaMask to Sepolia')
+
+      const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer)
+      const filter   = contract.filters.DocumentRegistered(accounts[0], null, null)
+      const events   = await contract.queryFilter(filter)
+
+      const out: Doc[] = await Promise.all(events.map(async (ev) => {
+        const cid = ev.args!.cid as string
+        const ts  = Number(ev.args!.timestamp)
+        const date = new Date(ts * 1000).toLocaleString()
+
+        let name = cid.slice(0,8) + '…'
         try {
-            if (!window.ethereum) {
-                throw new Error("MetaMask not detected");
-            }
+          const metaResp = await fetch(PINATA_API + cid, {
+            headers: { Authorization: `Bearer ${process.env.NEXT_PUBLIC_PINATA_JWT}` }
+          })
+          const metaJson = await metaResp.json()
+          name = metaJson.rows?.[0]?.metadata?.name || name
+        } catch {}
 
-            // Don’t prompt again—just check if already connected
-            const accounts: string[] = await window.ethereum.request({
-                method: "eth_accounts",
-            });
-            if (accounts.length === 0) {
-                throw new Error("Please connect your wallet first");
-            }
+        return { cid, name, date }
+      }))
 
-            const provider = new ethers.BrowserProvider(window.ethereum as any);
-            const signer = await provider.getSigner();
-            const { chainId } = await provider.getNetwork();
+      setDocs(out)
+    } catch (e: any) {
+      console.error('DocumentList load error:', e)
+      setError(e.message)
+    } finally {
+      setLoading(false)
+    }
+  }, [refreshKey])
 
-            // Provider returns BigInt, cast to number
-            if (Number(chainId) !== 11155111) {
-                throw new Error("Please switch MetaMask to Sepolia");
-            }
+  useEffect(() => { load() }, [load])
 
-            const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
-            const list: string[] = await contract.getUsername();
-            console.log("[DocumentList] on‑chain CIDs:", list);
-            setCids(list);
-        } catch (e: any) {
-            console.error("[DocumentList] load error:", e);
-            setError(e.message);
-        } finally {
-            setLoading(false);
-        }
-    }, [refreshKey]);
+  // decrypt & trigger download
+  async function handleDownload(cid: string, filename: string) {
+    try {
+      // 1) Fetch encrypted Base64 JSON from IPFS
+      const res    = await fetch(`${IPFS_GATEWAY}${cid}`)
+      const base64 = await res.text()
+      const encryptedJson = atob(base64)
 
-    useEffect(() => {
-        load();
-    }, [load]);
+      // 2) Prompt decrypt via MetaMask
+      const [account] = await window.ethereum.request({ method: 'eth_requestAccounts' })
+      const decryptedBase64: string = await window.ethereum.request({
+        method: 'eth_decrypt',
+        params: [encryptedJson, account],
+      })
 
-    async function handleView(cid: string) {
-      try {
-        // 1) Fetch the encrypted Base64 JSON from IPFS
-        const res    = await fetch(`${IPFS_GATEWAY}${cid}`);
-        const base64 = await res.text();
-    
-        // 2) atob → JSON string
-        const encryptedJson = atob(base64);
-    
-        // 3) Trigger MetaMask decrypt dialog
-        //    Use eth_requestAccounts to ensure the popup appears
-        const [account] = await window.ethereum.request({
-          method: 'eth_requestAccounts',
-        });
-        const decryptedBase64: string = await window.ethereum.request({
-          method: 'eth_decrypt',
-          params: [encryptedJson, account],
-        });
-    
-        // 4) Rebuild PDF from decrypted Base64
-        const binary = atob(decryptedBase64);
-        const bytes  = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) {
-          bytes[i] = binary.charCodeAt(i);
-        }
-        const blob = new Blob([bytes], { type: 'application/pdf' });
-        window.open(URL.createObjectURL(blob), '_blank');
-      } catch (err: any) {
-        console.error('[DocumentList] decrypt error:', err);
-        alert(err.message || 'Failed to decrypt & view');
+      // 3) Rebuild PDF Blob
+      const binary = atob(decryptedBase64)
+      const bytes  = new Uint8Array(binary.length)
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i)
       }
+      const blob = new Blob([bytes], { type: 'application/pdf' })
+
+      // 4) Programmatic download
+      const url = URL.createObjectURL(blob)
+      const a   = document.createElement('a')
+      a.href     = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+
+    } catch (e: any) {
+      console.error('Download error:', e)
+      alert(e.message || 'Failed to decrypt & download')
     }
+  }
 
-    if (loading) {
-        return (
-            <div className="max-w-3xl mx-auto p-6 text-center">Loading…</div>
-        );
-    }
+  if (loading) {
+    return <div className="max-w-3xl mx-auto p-6 text-center">Loading…</div>
+  }
 
-    return (
-        <div className="max-w-3xl mx-auto bg-white p-6 rounded shadow mt-8">
-            <h3 className="text-xl font-semibold mb-4">Your Documents</h3>
-
-            {error && <p className="text-red-600 mb-4">{error}</p>}
-
-            {!error && cids.length === 0 ? (
-                <p className="text-gray-500">No documents uploaded yet.</p>
-            ) : (
-                <ul className="list-disc list-inside">
-                    {cids.map((cid) => (
-                        <li key={cid} className="mb-4 flex items-center">
-                            <a
-                                href={IPFS_GATEWAY + cid}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-blue-600 hover:underline flex-1"
-                            >
-                                {cid}
-                            </a>
-                            <button
-                                onClick={() => handleView(cid)}
-                                className="ml-4 px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700"
-                            >
-                                Decrypt & View
-                            </button>
-                        </li>
-                    ))}
-                </ul>
-            )}
-        </div>
-    );
+  return (
+    <div className="max-w-3xl mx-auto bg-white p-6 rounded shadow mt-8">
+      <h3 className="text-xl font-semibold mb-4">Your Documents</h3>
+      {error && <p className="text-red-600 mb-4">{error}</p>}
+      {docs.length === 0 && !error ? (
+        <p className="text-gray-500">No documents uploaded yet.</p>
+      ) : (
+        <ul className="space-y-3">
+          {docs.map(({ cid, name, date }) => (
+            <li key={cid} className="flex justify-between items-center">
+              <div>
+                <p className="font-medium">{name}</p>
+                <p className="text-sm text-gray-600">{date}</p>
+              </div>
+              <button
+                onClick={() => handleDownload(cid, name)}
+                className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                Download
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
 }
