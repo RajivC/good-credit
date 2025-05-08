@@ -43,12 +43,13 @@ export function UploadFile({
       // 4) Pin to IPFS
       const encryptedFile = new File(
         [new Blob([payload], { type: 'application/octet-stream' })],
-        `${file.name}.enc`,
+        `${file.name}`,
         { type: 'application/octet-stream' }
       )
       const newCid = await uploadToPinata(encryptedFile)
       console.log('[UploadFile] new CID:', newCid)
       setCid(newCid)
+      localStorage.setItem(newCid, encryptedFile.name)
 
       // 5) Write on-chain
       await window.ethereum.request({ method: 'eth_requestAccounts' })
@@ -91,7 +92,7 @@ export function UploadFile({
       </button>
       {cid && (
         <p className="mt-4 break-all">
-          <strong>📌 Pinned! CID:</strong> {cid}
+          <strong>📌 Pinned! CID Created</strong>
         </p>
       )}
       {txHash && (

@@ -46,13 +46,14 @@ export function DocumentList({ refreshKey }: { refreshKey?: number }) {
         const ts   = Number(ev.args!.timestamp)
         const date = new Date(ts * 1000).toLocaleString()
 
-        let name = cid.slice(0,8) + '…'
+        let name = localStorage.getItem(cid) || cid.slice(0,8) + '…'
         try {
           const metaResp = await fetch(PINATA_API + cid, {
             headers: { Authorization: `Bearer ${process.env.NEXT_PUBLIC_PINATA_JWT}` },
           })
           const metaJson = await metaResp.json()
           name = metaJson.rows?.[0]?.metadata?.name || name
+          localStorage.setItem(cid, name)
         } catch {
           /* ignore */
         }
@@ -171,7 +172,7 @@ export function DocumentList({ refreshKey }: { refreshKey?: number }) {
 
       {activeCid && (
         <div className="p-4 border rounded bg-gray-50 space-y-3">
-          <p className="font-medium">Encrypted JSON for {activeCid}</p>
+          <p className="font-medium">Encrypted JSON for Active CID</p>
           <textarea
             className="w-full h-40 p-2 border rounded resize-none"
             value={encryptedJson}
