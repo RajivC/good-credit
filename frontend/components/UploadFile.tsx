@@ -1,3 +1,4 @@
+// components/UploadFile.tsx
 import { useState } from 'react'
 import { ethers } from 'ethers'
 import DocumentRegistryArtifact from '../abis/DocumentRegistry.json'
@@ -6,10 +7,14 @@ import { uploadToPinata } from '../lib/pinata'
 
 const ABI = DocumentRegistryArtifact.abi
 
-export function UploadFile() {
-  const [cid, setCid] = useState<string | null>(null)
+export function UploadFile({
+  onSuccess,
+}: {
+  onSuccess?: () => void
+}) {
+  const [cid, setCid]       = useState<string | null>(null)
   const [txHash, setTxHash] = useState<string | null>(null)
-  const [file, setFile] = useState<File | null>(null)
+  const [file, setFile]     = useState<File | null>(null)
   const [loading, setLoading] = useState(false)
 
   async function handleUpload() {
@@ -20,42 +25,42 @@ export function UploadFile() {
     setLoading(true)
 
     try {
-      // 1) Validate contract address
+      // 1) Make sure we have the right contract
       const address = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS
-      if (!address) {
-        throw new Error('Missing NEXT_PUBLIC_CONTRACT_ADDRESS in .env.local')
-      }
+      if (!address) throw new Error('Missing CONTRACT_ADDRESS')
 
-      // 2) Ensure Sepolia network
+      // 2) Ensure Sepolia
       const chainId = await window.ethereum.request({ method: 'eth_chainId' })
       if (chainId !== '0xaa36a7') {
-        throw new Error('Please switch MetaMask to Sepolia')
+        throw new Error('Switch MetaMask to Sepolia')
       }
 
-      // 3) Fetch public key and encrypt file contents
+      // 3) Encrypt
       const publicKey = await getPublicKey()
-      const rawBuffer = await file.arrayBuffer()
-      const rawText = new TextDecoder().decode(rawBuffer)
-      const encryptedPayload = encryptData(publicKey, rawText)
+      const rawText   = new TextDecoder().decode(await file.arrayBuffer())
+      const payload   = encryptData(publicKey, rawText)
 
-      // 4) Wrap payload in a Blob and upload via uploadToPinata
-      const blob = new Blob([encryptedPayload], { type: 'application/octet-stream' })
-      const encryptedFile = new File([blob], file.name + '.enc', {
-        type: 'application/octet-stream',
-      })
+      // 4) Pin to IPFS
+      const encryptedFile = new File(
+        [new Blob([payload], { type: 'application/octet-stream' })],
+        file.name + '.enc',
+        { type: 'application/octet-stream' }
+      )
       const newCid = await uploadToPinata(encryptedFile)
       setCid(newCid)
 
-      // 5) Register the CID on‑chain
+      // 5) Write on‑chain
       await window.ethereum.request({ method: 'eth_requestAccounts' })
       const provider = new ethers.BrowserProvider(window.ethereum as any)
-      const signer = await provider.getSigner()
+      const signer   = await provider.getSigner()
       const contract = new ethers.Contract(address, ABI, signer)
 
       const tx = await contract.registerUsername(newCid)
       const receipt = await tx.wait()
       setTxHash(receipt.transactionHash)
 
+      // let the list know to refresh
+      onSuccess?.()
     } catch (err: any) {
       console.error('UploadFile error:', err)
       alert(err.message || 'Upload failed')
@@ -81,16 +86,8 @@ export function UploadFile() {
       >
         {loading ? 'Processing…' : 'Encrypt & Register'}
       </button>
-      {cid && (
-        <p className="mt-4 break-all">
-          <strong>CID:</strong> {cid}
-        </p>
-      )}
-      {txHash && (
-        <p className="mt-2 break-all text-blue-600">
-          <strong>TxHash:</strong> {txHash}
-        </p>
-      )}
+      {cid    && <p className="mt-4 break-all"><strong>CID:</strong> {cid}</p>}
+      {txHash && <p className="mt-2 break-all text-blue-600"><strong>TxHash:</strong> {txHash}</p>}
     </div>
   )
 }
